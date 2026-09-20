@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "sie-code": {
+      "type": "stdio",
+      "command": "D:\\Business\\Superlinked\\.venv\\Scripts\\python.exe",
+      "args": ["D:\\Business\\Superlinked\\sie_code_mcp.py"]
+    }
+  }
+}

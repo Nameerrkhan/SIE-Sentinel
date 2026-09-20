@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel</title>
+<style>
+  :root{
+    --bg:#0b0c0e; --panel:#131417; --panel-2:#0f1013; --line:#23262c;
+    --line-2:#1a1c21; --txt:#d7dae0; --muted:#8b929e; --faint:#5a616c;
+    --accent:#e0a458; --accent-dim:#3a2f1e;
+    --crit:#e5484d; --high:#e0863c; --med:#d9b64e; --low:#6a7480; --ok:#4a9e6a;
+    --mono:"SF Mono","JetBrains Mono","IBM Plex Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);
+    font-size:14px;line-height:1.45;display:grid;grid-template-columns:224px 1fr;
+    height:100vh;overflow:hidden}
+
+  /* ---- left rail ---- */
+  .rail{border-right:1px solid var(--line);background:var(--panel-2);
+    display:flex;flex-direction:column;padding:16px 0}
+  .brand{padding:0 18px 18px;display:flex;align-items:baseline;gap:8px}
+  .brand b{font-family:var(--mono);letter-spacing:2px;font-size:15px;font-weight:600}
+  .brand span{color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:1px}
+  .modes{display:flex;flex-direction:column;gap:2px;padding:6px 10px}
+  .mode{text-align:left;background:none;border:1px solid transparent;border-radius:6px;
+    color:var(--muted);padding:9px 11px;cursor:pointer;font-family:inherit;font-size:13px;
+    display:flex;flex-direction:column;gap:1px}
+  .mode small{color:var(--faint);font-size:10.5px;font-family:var(--mono)}
+  .mode:hover{background:var(--panel);color:var(--txt)}
+  .mode.on{background:var(--panel);border-color:var(--line);color:var(--txt)}
+  .mode.on b{color:var(--accent)}
+  .rail-foot{margin-top:auto;padding:12px 18px 4px;border-top:1px solid var(--line-2);
+    font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;
+    flex-direction:column;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block;
+    margin-right:6px;vertical-align:middle}
+  .dot.up{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+  .dot.down{background:var(--crit)}
+
+  /* ---- main ---- */
+  .main{overflow:hidden;display:flex;flex-direction:column;min-height:0}
+  .main > section{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+  .head{padding:20px 26px 16px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .head h1{margin:0;font-size:17px;font-weight:600;letter-spacing:-.2px}
+  .head p{margin:5px 0 0;color:var(--muted);font-size:13px;max-width:70ch}
+  .body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 26px}
+
+  /* ---- controls ---- */
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:18px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld label{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);
+    font-family:var(--mono)}
+  select,input[type=text],input[type=number]{background:var(--panel);border:1px solid var(--line);
+    color:var(--txt);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:13px;
+    min-width:120px}
+  select:focus,input:focus{outline:none;border-color:var(--accent)}
+  .chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);
+    font-family:var(--mono);cursor:pointer;padding-bottom:8px}
+  .chk input{accent-color:var(--accent)}
+  button.go{background:var(--accent);color:#1a1206;border:none;border-radius:6px;
+    padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit}
+  button.go:hover{background:#e8b06a}
+  button.go:disabled{opacity:.45;cursor:default}
+  button.stop{background:none;border:1px solid var(--crit);color:var(--crit);border-radius:6px;
+    padding:9px 16px;cursor:pointer;font-family:inherit;font-size:13px}
+  button.ghost{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;
+    padding:8px 12px;cursor:pointer;font-family:var(--mono);font-size:12px}
+  button.ghost:hover{border-color:var(--muted);color:var(--txt)}
+
+  /* ---- panels ---- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  @media(max-width:1000px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .card .cap{padding:10px 14px;border-bottom:1px solid var(--line-2);font-family:var(--mono);
+    font-size:11px;letter-spacing:.5px;color:var(--faint);text-transform:uppercase;
+    display:flex;justify-content:space-between;align-items:center}
+
+  /* console */
+  .console{font-family:var(--mono);font-size:12px;line-height:1.6;padding:12px 14px;
+    height:340px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#aeb4bd}
+  .console .stage{color:var(--accent)}
+  .console .hit{color:var(--txt)}
+  .console .drop{color:var(--faint)}
+  .console .done{color:var(--ok)}
+  .console .cur::after{content:"_";animation:blink 1s steps(1) infinite;color:var(--accent)}
+  @keyframes blink{50%{opacity:0}}
+
+  /* stat row */
+  .stats{display:flex;gap:22px;padding:12px 14px;flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column}
+  .stat b{font-family:var(--mono);font-size:19px;font-weight:600}
+  .stat span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;
+    font-family:var(--mono)}
+
+  /* findings table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;padding:8px 14px;font-family:var(--mono);font-size:10.5px;
+    letter-spacing:.5px;color:var(--faint);text-transform:uppercase;border-bottom:1px solid var(--line-2)}
+  tbody tr{border-bottom:1px solid var(--line-2);cursor:pointer}
+  tbody tr:hover{background:var(--panel-2)}
+  tbody td{padding:9px 14px;vertical-align:top}
+  td.loc{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .chip{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;
+    letter-spacing:.5px;padding:2px 7px;border-radius:4px;text-transform:uppercase}
+  .chip.critical{background:rgba(229,72,77,.14);color:var(--crit);border:1px solid rgba(229,72,77,.35)}
+  .chip.high{background:rgba(224,134,60,.14);color:var(--high);border:1px solid rgba(224,134,60,.35)}
+  .chip.medium{background:rgba(217,182,78,.13);color:var(--med);border:1px solid rgba(217,182,78,.3)}
+  .chip.low{background:rgba(106,116,128,.16);color:#9aa2ad;border:1px solid rgba(106,116,128,.3)}
+  .chip.warn{background:rgba(217,182,78,.13);color:var(--med)}
+  .detail{padding:0 14px 14px;font-size:12.5px;color:var(--muted);display:none}
+  .detail.open{display:block}
+  .detail div{margin-top:9px}
+  .detail k{color:var(--faint);font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;
+    text-transform:uppercase;display:block;margin-bottom:2px}
+  .verified{color:var(--ok);font-family:var(--mono);font-size:11px}
+  .unverified{color:var(--med);font-family:var(--mono);font-size:11px}
+
+  /* pentest */
+  .narr{background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--accent);
+    border-radius:8px;padding:16px 18px;margin-bottom:16px;color:#c3c8d0;font-size:13.5px}
+  .poc{background:var(--panel);border:1px solid var(--line);border-radius:9px;margin-bottom:14px;
+    overflow:hidden}
+  .poc .top{padding:12px 15px;border-bottom:1px solid var(--line-2);display:flex;gap:10px;
+    align-items:center;flex-wrap:wrap}
+  .poc .top h3{margin:0;font-size:14px;font-weight:600;flex:1}
+  .poc .meta{padding:12px 15px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12.5px}
+  .poc .meta k{display:block;color:var(--faint);font-family:var(--mono);font-size:10px;
+    text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+  .poc ol{margin:0;padding:0 15px 12px 32px;font-size:12.5px;color:var(--muted)}
+  pre{margin:0;background:var(--panel-2);border-top:1px solid var(--line-2);padding:13px 15px;
+    overflow:auto;font-family:var(--mono);font-size:12px;color:#c9cfd8;position:relative}
+  pre .cp{position:absolute;top:8px;right:8px}
+  .cvss{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+  /* monitor */
+  .mon-top{display:flex;gap:18px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .counter{display:flex;gap:20px}
+  .counter .c b{font-family:var(--mono);font-size:22px}
+  .counter .c span{display:block;font-size:10px;color:var(--faint);text-transform:uppercase;
+    letter-spacing:.6px;font-family:var(--mono)}
+  .strip{display:flex;gap:2px;height:26px;align-items:flex-end;flex:1;min-width:160px;
+    background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:4px 6px;overflow:hidden}
+  .tick{width:4px;border-radius:1px;background:var(--ok);opacity:.5}
+  .tick.warn{background:var(--med);opacity:1}.tick.high{background:var(--high);opacity:1}
+  .tick.critical{background:var(--crit);opacity:1}
+  .feed{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .row{display:grid;grid-template-columns:64px 130px 1fr auto;gap:12px;padding:9px 14px;
+    border-bottom:1px solid var(--line-2);font-size:12.5px;align-items:center}
+  .row .t{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .row .src{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .row .txt{color:#aeb4bd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row.alert{background:rgba(224,134,60,.05)}
+  .row.alert.critical{background:rgba(229,72,77,.07)}
+  .row .verdict{font-family:var(--mono);font-size:11px;display:flex;gap:6px;align-items:center;justify-self:end}
+  .row .sig{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+  .blocked-tag{font-family:var(--mono);font-size:9px;color:var(--crit);border:1px solid rgba(229,72,77,.4);
+    border-radius:3px;padding:1px 4px}
+
+  .empty{color:var(--faint);font-family:var(--mono);font-size:12.5px;padding:30px 0;text-align:center}
+  .hide{display:none !important}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#262a31;border-radius:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+  <nav class="rail">
+    <div class="brand"><b>SENTINEL</b><span>SIE</span></div>
+    <div class="modes">
+      <button class="mode on" data-m="scan"><b>Scan</b><small>find &amp; validate bugs</small></button>
+      <button class="mode" data-m="pentest"><b>Pen-test</b><small>PoCs from findings</small></button>
+      <button class="mode" data-m="monitor"><b>Monitor</b><small>live injection watch</small></button>
+    </div>
+    <div class="rail-foot">
+      <div id="health"><span class="dot"></span>checking SIE…</div>
+      <div id="hmodel" style="color:var(--faint)"></div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- SCAN -->
+    <section id="v-scan">
+      <div class="head">
+        <h1>Scan</h1>
+        <p>A static pass over the taint-query set: retrieve, triage, deep-read with
+           surrounding code, then a disprove-check. Only findings that survive are shown.</p>
+      </div>
+      <div class="body">
+        <div class="bar">
+          <div class="fld"><label>repo</label><select id="s-repo"></select></div>
+          <div class="fld"><label>scope (optional)</label>
+            <input type="text" id="s-include" placeholder="crates/server,crates/executors"></div>
+          <label class="chk"><input type="checkbox" id="s-fast">fast</label>
+          <label class="chk"><input type="checkbox" id="s-pt">+ PoCs</label>
+          <button class="go" id="s-run">Run scan</button>
+          <button class="stop hide" id="s-stop">Stop</button>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <div class="cap">run log <span id="s-clock"></span></div>
+            <div class="console" id="s-log"><span class="cur"></span></div>
+            <div class="stats" id="s-stats"></div>
+          </div>
+          <div class="card">
+            <div class="cap">findings <span id="s-sev"></span></div>
+            <div id="s-findings"><div class="empty">no scan run yet</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PENTEST -->
+    <section id="v-pentest" class="hide">
+      <div class="head">
+        <h1>Pen-test</h1>
+        <p>Turns the findings that passed validation into reproducible proof-of-concepts
+           and one attack chain. Offline — it writes payloads, it never runs them.</p>
+      </div>
+      <div class="body">
+        <div class="bar">
+          <div class="fld"><label>repo (must have a scan)</label><select id="p-repo"></select></div>
+          <div class="fld"><label>min severity</label>
+            <select id="p-sev"><option>low</option><option>medium</option>
+              <option>high</option><option>critical</option></select></div>
+          <button class="go" id="p-run">Generate PoCs</button>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="cap">run log</div>
+          <div class="console" id="p-log" style="height:120px"><span class="cur"></span></div>
+        </div>
+        <div id="p-out"><div class="empty">pick a scanned repo and generate</div></div>
+      </div>
+    </section>
+
+    <!-- MONITOR -->
+    <section id="v-monitor" class="hide">
+      <div class="head">
+        <h1>Monitor</h1>
+        <p>Scores agent input for prompt injection as it streams — the open-source
+           gliguard model, signature rules, and a Qwen judge on the close calls.
+           Watch synthetic traffic, or read a repo's docs for a planted payload.</p>
+      </div>
+      <div class="body">
+        <div class="bar">
+          <div class="fld"><label>source</label>
+            <select id="m-src"><option value="demo">demo traffic</option><option value="repo">repo docs</option></select></div>
+          <div class="fld" id="m-repowrap" style="display:none"><label>repo</label>
+            <select id="m-repo"></select></div>
+          <div class="fld"><label>threshold <span id="m-thv" class="cvss">0.50</span></label>
+            <input type="range" id="m-th" min="0" max="1" step="0.05" value="0.5"></div>
+          <div class="fld"><label>on hit</label>
+            <select id="m-act"><option value="block">block</option><option value="alert">alert only</option></select></div>
+          <div class="fld" id="m-countwrap"><label>events</label><input type="number" id="m-count" value="30" min="4" max="200" style="min-width:80px"></div>
+          <div class="fld" id="m-arwrap"><label>attack rate <span id="m-arv" class="cvss">0.40</span></label>
+            <input type="range" id="m-ar" min="0" max="1" step="0.05" value="0.4"></div>
+          <button class="go" id="m-run">Start</button>
+          <button class="stop hide" id="m-stop">Stop</button>
+        </div>
+        <div class="mon-top">
+          <div class="counter">
+            <div class="c"><b id="m-ev">0</b><span>events</span></div>
+            <div class="c"><b id="m-al" style="color:var(--high)">0</b><span>alerts</span></div>
+            <div class="c"><b id="m-bl" style="color:var(--crit)">0</b><span>blocked</span></div>
+          </div>
+          <div class="strip" id="m-strip"></div>
+        </div>
+        <div class="feed" id="m-feed"><div class="empty">start the monitor to watch the stream</div></div>
+      </div>
+    </section>
+  </main>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>(s??"").toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---- mode switch ---- */
+$$('.mode').forEach(b=>b.onclick=()=>{
+  $$('.mode').forEach(x=>x.classList.toggle('on',x===b));
+  ['scan','pentest','monitor'].forEach(m=>$('#v-'+m).classList.toggle('hide',m!==b.dataset.m));
+});
+
+/* ---- streaming fetch of ndjson ---- */
+async function stream(url,body,onLine,signal){
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body),signal});
+  const rd=res.body.getReader(), dec=new TextDecoder(); let buf='';
+  for(;;){
+    const {done,value}=await rd.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true}); let i;
+    while((i=buf.indexOf('\n'))>=0){
+      const ln=buf.slice(0,i); buf=buf.slice(i+1);
+      if(ln.trim()) try{onLine(JSON.parse(ln))}catch{}
+    }
+  }
+}
+
+/* ---- health ---- */
+async function health(){
+  try{
+    const h=await (await fetch('/api/health')).json();
+    const ok=(h.encode_check||'').startsWith('OK');
+    $('#health').innerHTML=`<span class="dot ${ok?'up':'down'}"></span>SIE ${ok?'reachable':'unreachable'}`;
+    $('#hmodel').textContent=(h.models?.analyst||'')+' · '+(h.models?.guard||'').split('/').pop();
+  }catch{ $('#health').innerHTML='<span class="dot down"></span>SIE unreachable'; }
+}
+
+/* ---- repo lists ---- */
+async function repos(){
+  const {repos}=await (await fetch('/api/repos')).json();
+  const s=$('#s-repo'), p=$('#p-repo');
+  s.innerHTML=repos.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+  const scanned=repos.filter(r=>r.has_scan);
+  p.innerHTML=scanned.length?scanned.map(r=>`<option value="${esc(r.name)}">${esc(r.name)} · ${r.findings} finding(s)</option>`).join('')
+    :'<option value="">no scanned repos yet</option>';
+  const mr=$('#m-repo');
+  if(mr) mr.innerHTML=repos.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+  return repos;
+}
+
+/* ---- console line coloring ---- */
+function logLine(el,text){
+  const cur=$('.cur',el); let cls='';
+  if(/^\[\d\/\d\]|^\[8\]/.test(text)) cls='stage';
+  else if(/\[critical\]|\[high\]|\[medium\]/i.test(text)) cls='hit';
+  else if(/dropped:|skipped/i.test(text)) cls='drop';
+  else if(/^✓|findings|pen-test report/i.test(text)) cls='done';
+  const d=document.createElement('div'); d.className=cls; d.textContent=text;
+  el.insertBefore(d,cur); el.scrollTop=el.scrollHeight;
+}
+
+/* ============================ SCAN ============================ */
+let scanAbort=null;
+$('#s-run').onclick=async()=>{
+  const repo=$('#s-repo').value; if(!repo) return;
+  const log=$('#s-log'); log.innerHTML='<span class="cur"></span>';
+  $('#s-findings').innerHTML='<div class="empty">running…</div>';
+  $('#s-stats').innerHTML=''; $('#s-sev').textContent='';
+  $('#s-run').disabled=true; $('#s-stop').classList.remove('hide');
+  const t0=Date.now(); const clk=setInterval(()=>$('#s-clock').textContent=((Date.now()-t0)/1000|0)+'s',500);
+  scanAbort=new AbortController();
+  try{
+    await stream('/api/scan/run',{repo,fast:$('#s-fast').checked,
+      include:$('#s-include').value.trim(),pentest:$('#s-pt').checked},
+      msg=>{ if(msg.t==='log') logLine(log,msg.line);
+             else if(msg.t==='done') renderScan(msg.report);
+             else if(msg.t==='err') logLine(log,'error: '+msg.msg); },
+      scanAbort.signal);
+  }catch(e){ if(e.name!=='AbortError') logLine(log,'stream error: '+e.message); }
+  clearInterval(clk); $('#s-run').disabled=false; $('#s-stop').classList.add('hide');
+  repos();
+};
+$('#s-stop').onclick=()=>scanAbort&&scanAbort.abort();
+
+function renderScan(rep){
+  if(!rep){ $('#s-findings').innerHTML='<div class="empty">no report produced</div>'; return; }
+  const fs=rep.findings||[]; const cr=rep.credits?.credits_total ?? '—';
+  const sev={}; fs.forEach(f=>sev[f.severity]=(sev[f.severity]||0)+1);
+  $('#s-stats').innerHTML=[
+    ['findings',fs.length],['credits',cr],['seconds',Math.round(rep.elapsed_s||0)],
+    ['chunks',rep.stats?.chunks_embedded ?? '—']
+  ].map(([k,v])=>`<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+  $('#s-sev').innerHTML=['critical','high','medium','low'].filter(s=>sev[s])
+    .map(s=>`<span class="chip ${s}">${sev[s]} ${s}</span>`).join(' ');
+  if(!fs.length){ $('#s-findings').innerHTML='<div class="empty">nothing survived validation</div>'; return; }
+  const ord={critical:0,high:1,medium:2,low:3};
+  fs.sort((a,b)=>(ord[a.severity]??9)-(ord[b.severity]??9));
+  $('#s-findings').innerHTML=`<table><thead><tr><th>sev</th><th>cwe</th><th>finding</th></tr></thead>
+    <tbody>${fs.map((f,i)=>`
+      <tr data-i="${i}"><td><span class="chip ${f.severity}">${f.severity}</span></td>
+        <td class="loc">${esc(f.cwe)}</td>
+        <td>${esc(f.title)}<div class="loc">${esc(f.location)}</div></td></tr>
+      <tr class="drow"><td colspan="3" style="padding:0"><div class="detail" id="d${i}">
+        <div><k>source &rarr; sink</k>${esc(f.source_to_sink)}</div>
+        <div><k>trigger</k>${esc(f.trigger)}</div>
+        <div><k>fix</k>${esc(f.recommendation)}</div>
+        <div><k>validation</k>${esc(f.validation)} ·
+          <span class="${f.verified_location?'verified':'unverified'}">${f.verified_location?'location verified':'location unverified'}</span></div>
+      </div></td></tr>`).join('')}</tbody></table>`;
+  $$('#s-findings tr[data-i]').forEach(tr=>tr.onclick=()=>$('#d'+tr.dataset.i).classList.toggle('open'));
+}
+
+/* ============================ PENTEST ============================ */
+$('#p-run').onclick=async()=>{
+  const repo=$('#p-repo').value; if(!repo) return;
+  const log=$('#p-log'); log.innerHTML='<span class="cur"></span>';
+  $('#p-out').innerHTML='<div class="empty">generating…</div>'; $('#p-run').disabled=true;
+  try{
+    await stream('/api/pentest/run',{repo,min_severity:$('#p-sev').value},
+      msg=>{ if(msg.t==='log') logLine(log,msg.line);
+             else if(msg.t==='done') renderPentest(msg.report);
+             else if(msg.t==='err') logLine(log,'error: '+msg.msg); });
+  }catch(e){ logLine(log,'stream error: '+e.message); }
+  $('#p-run').disabled=false; repos();
+};
+function renderPentest(rep){
+  if(!rep||!rep.exploits){ $('#p-out').innerHTML='<div class="empty">no PoCs produced</div>'; return; }
+  let h=rep.attack_chain?`<div class="narr"><k style="color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.5px">ATTACK NARRATIVE</k><div style="margin-top:8px">${esc(rep.attack_chain).replace(/\n/g,'<br>')}</div></div>`:'';
+  h+=rep.exploits.map(x=>{
+    const f=x.finding,p=x.poc||{};
+    const steps=(p.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+    return `<div class="poc"><div class="top">
+      <span class="chip ${f.severity}">${f.severity}</span><h3>${esc(f.title)}</h3>
+      <span class="loc" style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(f.location)}</span></div>
+      <div class="meta">
+        <div><k>cvss 3.1</k><span class="cvss">${esc(p.cvss_v3_vector||'n/a')}</span></div>
+        <div><k>preconditions</k>${esc(p.preconditions||'—')}</div>
+        <div><k>impact</k>${esc(p.impact||'—')}</div>
+        <div><k>blast radius</k>${esc(p.blast_radius||'—')}</div></div>
+      ${steps?`<k style="display:block;padding:0 15px;color:var(--faint);font-family:var(--mono);font-size:10px">REPRODUCTION</k><ol>${steps}</ol>`:''}
+      <pre><button class="ghost cp" onclick="navigator.clipboard.writeText(this.parentNode.dataset.poc)">copy</button>${esc(p.poc||'(none)')}</pre>
+      <div class="meta"><div style="grid-column:1/3"><k>remediation</k>${esc(p.remediation||f.recommendation||'—')}</div></div>
+    </div>`.replace('<pre>',`<pre data-poc="${esc(p.poc||'')}">`);
+  }).join('');
+  $('#p-out').innerHTML=h;
+}
+
+/* ============================ MONITOR ============================ */
+let monAbort=null, mEv=0,mAl=0,mBl=0;
+$('#m-th').oninput=e=>$('#m-thv').textContent=(+e.target.value).toFixed(2);
+$('#m-ar').oninput=e=>$('#m-arv').textContent=(+e.target.value).toFixed(2);
+$('#m-src').onchange=e=>{
+  const repo=e.target.value==='repo';
+  $('#m-repowrap').style.display=repo?'':'none';
+  $('#m-countwrap').style.display=repo?'none':'';
+  $('#m-arwrap').style.display=repo?'none':'';
+};
+$('#m-run').onclick=async()=>{
+  mEv=mAl=mBl=0; upC(); $('#m-strip').innerHTML=''; $('#m-feed').innerHTML='';
+  $('#m-run').disabled=true; $('#m-stop').classList.remove('hide');
+  monAbort=new AbortController();
+  const req={action:$('#m-act').value,threshold:+$('#m-th').value};
+  if($('#m-src').value==='repo') req.repo=$('#m-repo').value;
+  else { req.count=+$('#m-count').value; req.attack_rate=+$('#m-ar').value; }
+  try{
+    await stream('/api/monitor/run',req,
+      msg=>{ if(msg.t==='event') feed(msg.rec); }, monAbort.signal);
+  }catch(e){ if(e.name!=='AbortError') console.error(e); }
+  $('#m-run').disabled=false; $('#m-stop').classList.add('hide');
+};
+$('#m-stop').onclick=()=>monAbort&&monAbort.abort();
+function upC(){ $('#m-ev').textContent=mEv; $('#m-al').textContent=mAl; $('#m-bl').textContent=mBl; }
+function feed(r){
+  if(r.error) return;
+  mEv++; if(r.alerted) mAl++; if(r.blocked) mBl++; upC();
+  const sv=r.alerted?r.severity:'ok';
+  const tick=document.createElement('div'); tick.className='tick '+(r.alerted?sv:'');
+  tick.style.height=(6+Math.round((r.score||0)*20))+'px';
+  const strip=$('#m-strip'); strip.appendChild(tick);
+  while(strip.children.length>70) strip.removeChild(strip.firstChild);
+  if($('.empty',$('#m-feed'))) $('#m-feed').innerHTML='';
+  const row=document.createElement('div');
+  row.className='row'+(r.alerted?' alert '+sv:'');
+  const sig=(r.signals||[]).join(' ');
+  row.innerHTML=`<div class="t">${esc(r.ts)}</div><div class="src">${esc(r.source)}</div>
+    <div class="txt" title="${esc(r.text)}">${esc(r.text)}</div>
+    <div class="verdict">${r.blocked?'<span class="blocked-tag">BLOCKED</span>':''}
+      <span class="${r.alerted?'chip '+sv:''}" style="${r.alerted?'':'color:var(--ok)'}">${esc(r.label)} ${r.score}</span>
+      ${sig?`<span class="sig">${esc(sig)}</span>`:''}</div>`;
+  const feedEl=$('#m-feed'); feedEl.insertBefore(row,feedEl.firstChild);
+  while(feedEl.children.length>120) feedEl.removeChild(feedEl.lastChild);
+}
+
+/* init */
+health(); repos(); setInterval(health,60000);
+</script>
+</body>
+</html>
