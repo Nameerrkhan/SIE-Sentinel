@@ -114,11 +114,9 @@ vibe-kanban goes from 1 of 5 to 5 of 5.
 `sie_code_mcp.py` exposes the same SIE tools to Claude Code for interactive work
 (search a codebase, check a string for injection, reason over specific chunks).
 
-```bash
-claude mcp add sie-code -- D:\Business\Superlinked\.venv\Scripts\python.exe D:\Business\Superlinked\sie_code_mcp.py
-```
-
-Restart Claude Code, run `/mcp`, and ask it to run `sie_health` first.
+Register it as an MCP server in Claude Code, pointing at the venv's Python and
+`sie_code_mcp.py`. Then restart Claude Code, run `/mcp`, and ask it to run
+`sie_health` first.
 
 ## Scope
 
